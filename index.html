@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visor de Riesgo por Deslizamiento — Universidad del Quindío</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&family=Source+Sans+3:wght@300;400;600&display=swap" rel="stylesheet"/>
+
+  <style>
+    :root {
+      --verde:       #1a7a1a;
+      --verde-oscuro:#125512;
+      --verde-claro: #2ca82c;
+      --verde-suave: #e8f5e8;
+      --verde-medio: #c8e6c8;
+      --blanco:      #ffffff;
+      --gris-claro:  #f4f7f4;
+      --gris-texto:  #3a3a3a;
+      --alto:        #c0392b;
+      --alto-suave:  #fdecea;
+      --medio:       #e67e22;
+      --medio-suave: #fef3e2;
+      --sin-riesgo:  #27ae60;
+      --sin-suave:   #eafaf1;
+      --sombra:      0 4px 24px rgba(26,122,26,0.13);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Source Sans 3', sans-serif;
+      background: var(--gris-claro);
+      color: var(--gris-texto);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: var(--verde);
+      color: var(--blanco);
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 10px 28px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.25);
+      z-index: 1000;
+      flex-shrink: 0;
+    }
+
+    .header-logo {
+      height: 62px;
+      width: auto;
+      filter: brightness(0) invert(1);
+      flex-shrink: 0;
+    }
+
+    .header-divider {
+      width: 2px;
+      height: 50px;
+      background: rgba(255,255,255,0.35);
+      flex-shrink: 0;
+    }
+
+    .header-text h1 {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 900;
+      font-size: 1.15rem;
+      letter-spacing: 0.01em;
+      line-height: 1.2;
+    }
+
+    .header-text p {
+      font-size: 0.78rem;
+      opacity: 0.85;
+      margin-top: 2px;
+      font-weight: 300;
+    }
+
+    .header-badge {
+      margin-left: auto;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    /* ── LAYOUT PRINCIPAL ── */
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── PANEL LATERAL ── */
+    .panel {
+      width: 360px;
+      flex-shrink: 0;
+      background: var(--blanco);
+      border-right: 1px solid var(--verde-medio);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      z-index: 500;
+    }
+
+    .panel-section {
+      padding: 22px 22px 18px;
+      border-bottom: 1px solid var(--verde-medio);
+    }
+
+    .panel-section h2 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--verde);
+      margin-bottom: 12px;
+    }
+
+    /* Buscador */
+    .search-wrap {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    #inputCedula {
+      flex: 1;
+      padding: 11px 14px;
+      border: 2px solid var(--verde-medio);
+      border-radius: 8px;
+      font-family: 'Source Sans 3', sans-serif;
+      font-size: 0.88rem;
+      color: var(--gris-texto);
+      transition: border-color 0.2s;
+      outline: none;
+    }
+
+    #inputCedula:focus {
+      border-color: var(--verde);
+    }
+
+    #inputCedula::placeholder {
+      color: #aaa;
+      font-size: 0.82rem;
+    }
+
+    #btnBuscar {
+      background: var(--verde);
+      color: var(--blanco);
+      border: none;
+      border-radius: 8px;
+      padding: 0 18px;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      letter-spacing: 0.03em;
+    }
+
+    #btnBuscar:hover  { background: var(--verde-claro); }
+    #btnBuscar:active { transform: scale(0.97); }
+
+    #btnLimpiar {
+      display: none;
+      width: 100%;
+      margin-top: 8px;
+      background: none;
+      border: 1.5px solid var(--verde-medio);
+      border-radius: 8px;
+      padding: 8px;
+      font-family: 'Source Sans 3', sans-serif;
+      font-size: 0.82rem;
+      color: #888;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    #btnLimpiar:hover { border-color: var(--verde); color: var(--verde); }
+
+    /* Resultado */
+    #resultado {
+      display: none;
+      border-radius: 10px;
+      padding: 18px;
+      margin-top: 4px;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+    #resultado.alto   { background: var(--alto-suave);  border-left: 5px solid var(--alto); }
+    #resultado.medio  { background: var(--medio-suave); border-left: 5px solid var(--medio); }
+    #resultado.sin    { background: var(--sin-suave);   border-left: 5px solid var(--sin-riesgo); }
+    #resultado.error  { background: #fef9f0;            border-left: 5px solid #bbb; }
+
+    .resultado-nivel {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 900;
+      font-size: 1.05rem;
+      margin-bottom: 4px;
+    }
+
+    .resultado-nivel.alto  { color: var(--alto); }
+    .resultado-nivel.medio { color: var(--medio); }
+    .resultado-nivel.sin   { color: var(--sin-riesgo); }
+    .resultado-nivel.error { color: #999; }
+
+    .resultado-desc {
+      font-size: 0.83rem;
+      line-height: 1.5;
+      color: #555;
+    }
+
+    .resultado-etiqueta {
+      font-size: 0.72rem;
+      color: #aaa;
+      margin-top: 8px;
+      word-break: break-all;
+      font-family: monospace;
+    }
+
+    /* Icono semáforo */
+    .nivel-icon {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+      margin-top: -2px;
+    }
+    .icon-alto  { background: var(--alto); }
+    .icon-medio { background: var(--medio); }
+    .icon-sin   { background: var(--sin-riesgo); }
+
+    /* Leyenda */
+    .leyenda-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: 0.84rem;
+    }
+
+    .leyenda-color {
+      width: 28px; height: 16px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      border: 1px solid rgba(0,0,0,0.1);
+    }
+
+    .leyenda-color.alto  { background: var(--alto); }
+    .leyenda-color.medio { background: var(--medio); }
+
+    .leyenda-text strong {
+      display: block;
+      font-weight: 600;
+      font-size: 0.82rem;
+    }
+    .leyenda-text span { color: #777; font-size: 0.76rem; }
+
+    /* Info estadísticas */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .stat-box {
+      background: var(--verde-suave);
+      border-radius: 8px;
+      padding: 12px 10px;
+      text-align: center;
+    }
+
+    .stat-num {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 900;
+      font-size: 1.4rem;
+      color: var(--verde);
+    }
+
+    .stat-label {
+      font-size: 0.72rem;
+      color: #666;
+      margin-top: 2px;
+    }
+
+    /* Footer del panel */
+    .panel-footer {
+      margin-top: auto;
+      padding: 14px 22px;
+      background: var(--verde-suave);
+      font-size: 0.72rem;
+      color: #888;
+      border-top: 1px solid var(--verde-medio);
+      line-height: 1.5;
+    }
+
+    /* Loader */
+    #loader {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(255,255,255,0.88);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    #loader.visible { display: flex; }
+
+    .spinner {
+      width: 48px; height: 48px;
+      border: 4px solid var(--verde-medio);
+      border-top-color: var(--verde);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loader-text {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.85rem;
+      color: var(--verde);
+      font-weight: 600;
+    }
+
+    /* Mapa */
+    #map {
+      flex: 1;
+      z-index: 1;
+    }
+
+    /* Tooltip personalizado Leaflet */
+    .leaflet-tooltip-custom {
+      background: var(--verde-oscuro);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-family: 'Source Sans 3', sans-serif;
+      font-size: 0.82rem;
+      padding: 6px 10px;
+      box-shadow: var(--sombra);
+    }
+
+    .leaflet-tooltip-custom::before { border-top-color: var(--verde-oscuro); }
+
+    /* Popup */
+    .popup-title {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 0.9rem;
+      margin-bottom: 6px;
+    }
+
+    .popup-row {
+      font-size: 0.8rem;
+      margin: 3px 0;
+    }
+
+    .popup-row strong { color: var(--verde-oscuro); }
+
+    /* Responsive hint */
+    @media (max-width: 700px) {
+      .panel { width: 100%; }
+      .main  { flex-direction: column; }
+      #map   { height: 55vh; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="spinner"></div>
+  <div class="loader-text" id="loaderText">Cargando datos…</div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <img class="header-logo" src="logo_uniquindio.png" alt="Logo Universidad del Quindío" />
+  <div class="header-divider"></div>
+  <div class="header-text">
+    <h1>Visor de Riesgo por Deslizamiento</h1>
+    <p>Gestión del Riesgo · Municipio de Armenia, Quindío</p>
+  </div>
+  <div class="header-badge">SIG · 2026</div>
+</header>
+
+<!-- LAYOUT PRINCIPAL -->
+<div class="main">
+
+  <!-- PANEL LATERAL -->
+  <aside class="panel">
+
+    <!-- BÚSQUEDA -->
+    <div class="panel-section">
+      <h2>🔍 Consultar predio</h2>
+      <div class="search-wrap">
+        <input id="inputCedula" type="text" placeholder="Ingrese cédula catastral…"
+               maxlength="35" autocomplete="off" />
+        <button id="btnBuscar">Buscar</button>
+      </div>
+      <button id="btnLimpiar">✕ Limpiar búsqueda</button>
+      <div id="resultado"></div>
+    </div>
+
+    <!-- LEYENDA -->
+    <div class="panel-section">
+      <h2>🗺 Leyenda</h2>
+      <div class="leyenda-item">
+        <div class="leyenda-color alto"></div>
+        <div class="leyenda-text">
+          <strong>Amenaza Alta</strong>
+          <span>Riesgo severo de deslizamiento</span>
+        </div>
+      </div>
+      <div class="leyenda-item">
+        <div class="leyenda-color medio"></div>
+        <div class="leyenda-text">
+          <strong>Amenaza Media</strong>
+          <span>Riesgo moderado de deslizamiento</span>
+        </div>
+      </div>
+      <div class="leyenda-item">
+        <div class="leyenda-color" style="background:#aaa;"></div>
+        <div class="leyenda-text">
+          <strong>Sin amenaza registrada</strong>
+          <span>Fuera de zonas de deslizamiento</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ESTADÍSTICAS -->
+    <div class="panel-section">
+      <h2>📊 Resumen del área</h2>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-num" id="statTotal">—</div>
+          <div class="stat-label">Construcciones totales</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="statRiesgo">—</div>
+          <div class="stat-label">En zona de riesgo</div>
+        </div>
+        <div class="stat-box" style="background:#fdecea;">
+          <div class="stat-num" style="color:var(--alto);" id="statAlto">—</div>
+          <div class="stat-label">Amenaza alta</div>
+        </div>
+        <div class="stat-box" style="background:var(--medio-suave);">
+          <div class="stat-num" style="color:var(--medio);" id="statMedio">—</div>
+          <div class="stat-label">Amenaza media</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- INSTRUCCIONES -->
+    <div class="panel-section">
+      <h2>ℹ️ ¿Cómo usar?</h2>
+      <p style="font-size:0.82rem; line-height:1.6; color:#555;">
+        Ingrese la <strong>cédula catastral</strong> del predio (30 dígitos) en el campo de búsqueda.
+        El sistema consultará si la construcción se encuentra en zona de amenaza por deslizamiento
+        y en qué nivel de riesgo está categorizada.
+        <br><br>
+        También puede hacer <strong>clic directamente</strong> sobre cualquier polígono en el mapa
+        para consultar su información.
+      </p>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="panel-footer">
+      Fuente: SIG Quindío · Capa de amenaza por deslizamiento<br>
+      Universidad del Quindío · Facultad de Ingeniería · 2026
+    </div>
+
+  </aside>
+
+  <!-- MAPA -->
+  <div id="map"></div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+//  CONFIGURACIÓN
+// ─────────────────────────────────────────────
+const CENTRO   = [4.5330, -75.6820];
+const ZOOM_INI = 13;
+const COLORES  = { Alto: '#c0392b', Medio: '#e67e22', '': '#888888' };
+const OPACIDAD = { Alto: 0.82, Medio: 0.75, '': 0.25 };
+
+// ─────────────────────────────────────────────
+//  MAPA LEAFLET
+// ─────────────────────────────────────────────
+const map = L.map('map', { center: CENTRO, zoom: ZOOM_INI, zoomControl: true });
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  maxZoom: 19
+}).addTo(map);
+
+// Capa de satélite opcional
+const satelite = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  { attribution: 'Esri', maxZoom: 19 }
+);
+
+L.control.layers(
+  { 'Mapa base': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(map),
+    'Satélite': satelite },
+  {}
+).addTo(map);
+
+// ─────────────────────────────────────────────
+//  VARIABLES GLOBALES
+// ─────────────────────────────────────────────
+let lookup       = {};
+let riesgoLayer  = null;
+let highlightLayer = null;
+let allFeatures  = [];
+
+// ─────────────────────────────────────────────
+//  CARGA DE DATOS
+// ─────────────────────────────────────────────
+function mostrarLoader(msg) {
+  document.getElementById('loaderText').textContent = msg || 'Cargando…';
+  document.getElementById('loader').classList.add('visible');
+}
+
+function ocultarLoader() {
+  document.getElementById('loader').classList.remove('visible');
+}
+
+async function cargarDatos() {
+  mostrarLoader('Cargando datos de predios…');
+  try {
+    // Cargar lookup (ETIQUETA → GRADO)
+    const rL = await fetch('datos/lookup.json');
+    lookup = await rL.json();
+
+    mostrarLoader('Cargando capas de riesgo…');
+
+    // Cargar GeoJSON de construcciones en riesgo
+    const rG = await fetch('datos/riesgo.geojson');
+    const geojson = await rG.json();
+    allFeatures = geojson.features;
+
+    // Actualizar estadísticas
+    const totalPredios = Object.keys(lookup).length;
+    const enRiesgo     = allFeatures.length;
+    const alto         = allFeatures.filter(f => f.properties.g === 'Alto').length;
+    const medio        = allFeatures.filter(f => f.properties.g === 'Medio').length;
+
+    document.getElementById('statTotal').textContent  = totalPredios.toLocaleString('es-CO');
+    document.getElementById('statRiesgo').textContent = enRiesgo.toLocaleString('es-CO');
+    document.getElementById('statAlto').textContent   = alto.toLocaleString('es-CO');
+    document.getElementById('statMedio').textContent  = medio.toLocaleString('es-CO');
+
+    // Renderizar capa GeoJSON
+    riesgoLayer = L.geoJSON(geojson, {
+      style: feature => ({
+        fillColor:   COLORES[feature.properties.g] || '#888',
+        fillOpacity: OPACIDAD[feature.properties.g] || 0.25,
+        color:       '#fff',
+        weight:      0.4,
+        opacity:     0.6
+      }),
+      onEachFeature: (feature, layer) => {
+        const g = feature.properties.g;
+        const e = feature.properties.e;
+        layer.bindTooltip(
+          `<strong>${g === 'Alto' ? '🔴' : '🟠'} Amenaza ${g}</strong><br/>
+           <span style="font-family:monospace;font-size:0.75rem">${e}</span>`,
+          { className: 'leaflet-tooltip-custom', sticky: true }
+        );
+        layer.on('click', () => buscarPorEtiqueta(e, true));
+      }
+    }).addTo(map);
+
+    ocultarLoader();
+
+  } catch (err) {
+    ocultarLoader();
+    console.error(err);
+    alert('Error cargando los datos. Verifique que los archivos estén en la carpeta /datos/');
+  }
+}
+
+// ─────────────────────────────────────────────
+//  BÚSQUEDA
+// ─────────────────────────────────────────────
+function buscarPorEtiqueta(etiqueta, desdeMapa) {
+  const input = document.getElementById('inputCedula');
+  if (!desdeMapa) {
+    etiqueta = input.value.trim().replace(/\s+/g, '');
+  } else {
+    input.value = etiqueta;
+  }
+
+  if (!etiqueta) return;
+
+  const info    = lookup[etiqueta];
+  const divRes  = document.getElementById('resultado');
+  const btnLimp = document.getElementById('btnLimpiar');
+
+  // Limpiar highlight anterior
+  if (highlightLayer) { map.removeLayer(highlightLayer); highlightLayer = null; }
+
+  divRes.style.display = 'block';
+  btnLimp.style.display = 'block';
+
+  if (!info) {
+    // No existe en el lookup
+    divRes.className = 'error';
+    divRes.innerHTML = `
+      <div class="resultado-nivel error">⚠️ Predio no encontrado</div>
+      <div class="resultado-desc">
+        La cédula catastral ingresada no se encuentra en la base de datos.
+        Verifique el número e intente nuevamente.
+      </div>
+      <div class="resultado-etiqueta">${etiqueta}</div>`;
+    return;
+  }
+
+  const grado = info.g;
+
+  if (!grado) {
+    // Existe pero sin amenaza
+    divRes.className = 'sin';
+    divRes.innerHTML = `
+      <div class="resultado-nivel sin"><span class="nivel-icon icon-sin"></span>Sin amenaza registrada</div>
+      <div class="resultado-desc">
+        Esta construcción <strong>no se encuentra</strong> en zona de amenaza por deslizamiento
+        según la información del SIG Quindío.
+      </div>
+      <div class="resultado-etiqueta">Cédula: ${etiqueta}</div>`;
+    return;
+  }
+
+  // Tiene amenaza: mostrar y hacer zoom
+  const colorClass = grado === 'Alto' ? 'alto' : 'medio';
+  const icono      = grado === 'Alto' ? '🔴' : '🟠';
+  const desc       = grado === 'Alto'
+    ? 'Esta construcción se encuentra en zona de <strong>amenaza alta</strong> por deslizamiento. Se recomienda priorizar medidas de gestión del riesgo.'
+    : 'Esta construcción se encuentra en zona de <strong>amenaza media</strong> por deslizamiento. Se recomienda seguimiento y monitoreo periódico.';
+
+  divRes.className = colorClass;
+  divRes.innerHTML = `
+    <div class="resultado-nivel ${colorClass}">${icono} Amenaza ${grado}</div>
+    <div class="resultado-desc">${desc}</div>
+    <div style="font-size:0.78rem; margin-top:8px; color:#777;">
+      <strong>Tipo de amenaza:</strong> ${info.t || 'Deslizamiento'}<br>
+      <strong>Tipo construcción:</strong> ${info.tc || 'N/D'}
+    </div>
+    <div class="resultado-etiqueta">Cédula: ${etiqueta}</div>`;
+
+  // Highlight en mapa
+  const feat = allFeatures.find(f => f.properties.e === etiqueta);
+  if (feat) {
+    highlightLayer = L.geoJSON(feat, {
+      style: {
+        fillColor:   COLORES[grado],
+        fillOpacity: 0.95,
+        color:       '#fff',
+        weight:      3,
+        opacity:     1
+      }
+    }).addTo(map);
+    map.fitBounds(highlightLayer.getBounds(), { maxZoom: 17, padding: [60, 60] });
+  }
+}
+
+function limpiar() {
+  document.getElementById('inputCedula').value = '';
+  document.getElementById('resultado').style.display = 'none';
+  document.getElementById('btnLimpiar').style.display = 'none';
+  if (highlightLayer) { map.removeLayer(highlightLayer); highlightLayer = null; }
+  map.setView(CENTRO, ZOOM_INI);
+}
+
+// ─────────────────────────────────────────────
+//  EVENTOS
+// ─────────────────────────────────────────────
+document.getElementById('btnBuscar').addEventListener('click', () => buscarPorEtiqueta());
+document.getElementById('inputCedula').addEventListener('keydown', e => {
+  if (e.key === 'Enter') buscarPorEtiqueta();
+});
+document.getElementById('btnLimpiar').addEventListener('click', limpiar);
+
+// ─────────────────────────────────────────────
+//  INICIO
+// ─────────────────────────────────────────────
+cargarDatos();
+</script>
+</body>
+</html>
